@@ -1,9 +1,10 @@
 // Cloudflare Worker: proxies a target site, strips frame-blocking headers,
 // rewrites relative URLs via <base>, and injects the Warmly widget script.
 
-// Loaded as the very first thing in <head> with no defer/async so they fire
-// before any framebusters or page scripts can interfere.
+// Warmly: top of <head>, runs immediately (uses shadow DOM, no styling conflicts).
 const WARMLY_SCRIPT = '<script id="warmly-script-loader" src="https://opps-widget.getwarmly.com/warmly.js?clientId=e46b6961c27fa5afcf0a9eb0a157542e"></script>';
+// Upvert: end of <body>, runs after page is fully parsed so it can read
+// title/meta/OG and so its CSS lands after the page's stylesheets.
 const UPVERT_SCRIPT = '<!-- Upvert site "Demo Instance" --><script src="https://cdn.upvertcdn.io/Ar9QyVOBhKFnFOS7CfH7HVF42pQvfT/loader.js"></script>';
 
 export default {
@@ -57,9 +58,9 @@ export default {
     html = html.replace(/<meta[^>]+http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, '');
     html = html.replace(/<meta[^>]+http-equiv=["']?X-Frame-Options["']?[^>]*>/gi, '');
 
-    // Inject Warmly + Upvert scripts as the FIRST thing inside <head>, before <base>,
-    // so they load regardless of what the page does later.
-    const headInjection = '\n  ' + WARMLY_SCRIPT + '\n  ' + UPVERT_SCRIPT + '\n  <base href="' + origin + '/">';
+    // Inject Warmly as the FIRST thing inside <head>, before <base>,
+    // so it loads regardless of what the page does later.
+    const headInjection = '\n  ' + WARMLY_SCRIPT + '\n  <base href="' + origin + '/">';
     if (/<head[^>]*>/i.test(html)) {
       html = html.replace(/<head([^>]*)>/i, '<head$1>' + headInjection);
     } else if (/<html[^>]*>/i.test(html)) {
@@ -68,8 +69,10 @@ export default {
       html = '<head>' + headInjection + '</head>' + html;
     }
 
-    // Click interceptor at end of body so internal nav stays inside the proxy
-    const bodyInjection = '\n<script>(function(){' +
+    // Click interceptor + Upvert at end of body. Upvert sits AFTER all
+    // page stylesheets so its injected styles take precedence and it can
+    // read the fully-parsed <title>/<meta>/OG tags.
+    const bodyInjection = '\n' + UPVERT_SCRIPT + '\n<script>(function(){' +
       'var W=' + JSON.stringify(workerOrigin) + ';' +
       'document.addEventListener("click",function(e){' +
         'var a=e.target&&e.target.closest&&e.target.closest("a");' +
