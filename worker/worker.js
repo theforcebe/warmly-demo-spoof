@@ -1,11 +1,49 @@
-// Cloudflare Worker: proxies a target site so it's iframeable.
-// Strips frame-blocking headers, rewrites relative URLs via <base href>,
-// and routes in-page navigation back through the proxy via a click handler.
-//
-// Note: widget scripts (Warmly, Upvert, etc.) are NOT injected here anymore.
-// They run on the outer GH Pages shell so they execute in a normal,
-// well-known origin and don't need the prospect's domain whitelisted in
-// every vendor's backend. The iframe is purely a visual backdrop.
+// Cloudflare Worker: proxies a target site, strips frame-blocking headers,
+// rewrites relative URLs via <base>, and injects the Warmly widget script.
+
+// Both injected at the top of <head>, no defer/async — fires reliably
+// before any page-level scripts can interfere.
+const WARMLY_SCRIPT = '<script id="warmly-script-loader" src="https://opps-widget.getwarmly.com/warmly.js?clientId=e46b6961c27fa5afcf0a9eb0a157542e"></script>';
+const UPVERT_SCRIPT = '<!-- Upvert site "Demo Instance" --><script src="https://cdn.upvertcdn.io/Ar9QyVOBhKFnFOS7CfH7HVF42pQvfT/loader.js"></script>';
+
+// Scoped CSS to repair Upvert popup layout when the proxied site's CSS
+// bleeds in. Real-world failure: site's iframe { width:100% !important }
+// (plus flex min-content) blows the Loom video out of the popup to the
+// left, overflowing the container.
+const UPVERT_FIXES = '<style id="upvert-fixes">\n' +
+'  .upvert-popup, .upvert-popup *, .upvert-popup *::before, .upvert-popup *::after {\n' +
+'    box-sizing: border-box !important;\n' +
+'    max-width: 100% !important;\n' +
+'    min-width: 0 !important;\n' +
+'  }\n' +
+'  .upvert-popup {\n' +
+'    overflow: hidden !important;\n' +
+'    animation: none !important;\n' +
+'    transition: none !important;\n' +
+'    opacity: 1 !important;\n' +
+'    visibility: visible !important;\n' +
+'    display: flex !important;\n' +
+'    pointer-events: auto !important;\n' +
+'    transform: none !important;\n' +
+'  }\n' +
+'  .upvert-popup * {\n' +
+'    animation-name: none !important;\n' +
+'    animation-duration: 0s !important;\n' +
+'  }\n' +
+'  .upvert-popup > div {\n' +
+'    flex: 1 1 auto !important;\n' +
+'    min-width: 0 !important;\n' +
+'    overflow: hidden !important;\n' +
+'  }\n' +
+'  .upvert-popup iframe {\n' +
+'    width: 100% !important;\n' +
+'    height: 100% !important;\n' +
+'    max-width: 100% !important;\n' +
+'    min-width: 0 !important;\n' +
+'    border: 0 !important;\n' +
+'    display: block !important;\n' +
+'  }\n' +
+'</style>';
 
 export default {
   async fetch(request) {
@@ -41,6 +79,7 @@ export default {
 
     const contentType = upstream.headers.get('content-type') || '';
 
+    // Non-HTML (rare here since assets load directly from origin via <base>) — pass through
     if (!contentType.includes('text/html')) {
       const headers = new Headers(upstream.headers);
       headers.delete('x-frame-options');
@@ -53,21 +92,31 @@ export default {
     const origin = targetUrl.origin;
     const workerOrigin = reqUrl.origin;
 
-    // Strip CSP and X-Frame-Options meta tags that could block iframing
+    // Strip CSP and X-Frame-Options meta tags before any other rewrites
     html = html.replace(/<meta[^>]+http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, '');
     html = html.replace(/<meta[^>]+http-equiv=["']?X-Frame-Options["']?[^>]*>/gi, '');
 
-    // <base href> at top of <head> so relative asset URLs resolve to the original site
-    const baseTag = '<base href="' + origin + '/">';
+    // Warmly + Upvert at top of <head>, then <base> for relative URL resolution.
+    // Upvert layout fixes go LAST (just before </head>) so they win specificity.
+    const headInjection = '\n  ' + WARMLY_SCRIPT + '\n  ' + UPVERT_SCRIPT + '\n  <base href="' + origin + '/">';
     if (/<head[^>]*>/i.test(html)) {
-      html = html.replace(/<head([^>]*)>/i, '<head$1>\n  ' + baseTag);
+      html = html.replace(/<head([^>]*)>/i, '<head$1>' + headInjection);
     } else if (/<html[^>]*>/i.test(html)) {
-      html = html.replace(/<html([^>]*)>/i, '<html$1><head>' + baseTag + '</head>');
+      html = html.replace(/<html([^>]*)>/i, '<html$1><head>' + headInjection + '\n' + UPVERT_FIXES + '\n</head>');
     } else {
-      html = '<head>' + baseTag + '</head>' + html;
+      html = '<head>' + headInjection + '\n' + UPVERT_FIXES + '\n</head>' + html;
     }
 
-    // Click interceptor at end of body so internal nav stays inside the proxy
+    // Inject Upvert layout fixes just before </head> so they load AFTER the
+    // page's stylesheets and win specificity battles via !important.
+    if (/<\/head>/i.test(html)) {
+      html = html.replace(/<\/head>/i, '\n  ' + UPVERT_FIXES + '\n</head>');
+    }
+
+    // End-of-body: click interceptor (proxy nav) + Upvert persistence guard.
+    // - Click interceptor keeps internal nav inside the proxy
+    // - Persistence guard locks the popup against site JS that hides it
+    //   via inline style writes or removes it via SPA reconciliation.
     const bodyInjection = '\n<script>(function(){' +
       'var W=' + JSON.stringify(workerOrigin) + ';' +
       'document.addEventListener("click",function(e){' +
@@ -81,6 +130,62 @@ export default {
           'location.href=W+"/?url="+encodeURIComponent(a.href);' +
         '}catch(err){}' +
       '},true);' +
+      '' +
+      'var popupRef=null,userClosed=false,attrObs=null;' +
+      'var locked={display:"flex",opacity:"1",visibility:"visible",' +
+        'animation:"none",transition:"none","pointer-events":"auto",' +
+        'transform:"none"};' +
+      'function applyLock(p){' +
+        'for(var k in locked){' +
+          'if(p.style.getPropertyValue(k)!==locked[k]||' +
+             'p.style.getPropertyPriority(k)!=="important"){' +
+            'p.style.setProperty(k,locked[k],"important");' +
+          '}' +
+        '}' +
+      '}' +
+      'function trackClose(p){' +
+        'p.querySelectorAll("button.i").forEach(function(b){' +
+          'b.addEventListener("click",function(e){' +
+            'if(!e.isTrusted)return;' +
+            'userClosed=true;' +
+            'if(attrObs){attrObs.disconnect();attrObs=null;}' +
+          '},true);' +
+        '});' +
+      '}' +
+      'function bind(p){' +
+        'if(popupRef===p)return;' +
+        'popupRef=p;' +
+        'trackClose(p);' +
+        'applyLock(p);' +
+        'if(attrObs)attrObs.disconnect();' +
+        'attrObs=new MutationObserver(function(){' +
+          'if(!userClosed)applyLock(p);' +
+        '});' +
+        'attrObs.observe(p,{attributes:true,' +
+          'attributeFilter:["style","class","hidden"]});' +
+        'if(p.parentNode!==document.documentElement){' +
+          'try{document.documentElement.appendChild(p);}catch(e){}' +
+        '}' +
+      '}' +
+      'var domObs=new MutationObserver(function(){' +
+        'if(userClosed)return;' +
+        'var live=document.querySelector(".upvert-popup");' +
+        'if(live){bind(live);}' +
+        'else if(popupRef&&!popupRef.parentNode){' +
+          'try{document.documentElement.appendChild(popupRef);}catch(e){}' +
+        '}' +
+      '});' +
+      'domObs.observe(document.documentElement,{childList:true,subtree:true});' +
+      '' +
+      'setInterval(function(){' +
+        'if(userClosed)return;' +
+        'var live=document.querySelector(".upvert-popup");' +
+        'if(live){bind(live);applyLock(live);}' +
+        'else if(popupRef){' +
+          'try{document.documentElement.appendChild(popupRef);applyLock(popupRef);}' +
+          'catch(e){}' +
+        '}' +
+      '},100);' +
       '})();</script>\n';
 
     if (/<\/body>/i.test(html)) {
@@ -92,6 +197,7 @@ export default {
     const headers = new Headers();
     headers.set('content-type', 'text/html; charset=utf-8');
     headers.set('cache-control', 'no-store');
+    // Explicitly do NOT set x-frame-options or CSP — we want this iframeable
 
     return new Response(html, { status: 200, headers });
   }
