@@ -16,7 +16,20 @@ const UPVERT_FIXES = '<style id="upvert-fixes">\n' +
 '    max-width: 100% !important;\n' +
 '    min-width: 0 !important;\n' +
 '  }\n' +
-'  .upvert-popup { overflow: hidden !important; }\n' +
+'  .upvert-popup {\n' +
+'    overflow: hidden !important;\n' +
+'    animation: none !important;\n' +
+'    transition: none !important;\n' +
+'    opacity: 1 !important;\n' +
+'    visibility: visible !important;\n' +
+'    display: flex !important;\n' +
+'    pointer-events: auto !important;\n' +
+'    transform: none !important;\n' +
+'  }\n' +
+'  .upvert-popup * {\n' +
+'    animation-name: none !important;\n' +
+'    animation-duration: 0s !important;\n' +
+'  }\n' +
 '  .upvert-popup > div {\n' +
 '    flex: 1 1 auto !important;\n' +
 '    min-width: 0 !important;\n' +
