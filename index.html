@@ -4,63 +4,25 @@
 <meta charset="UTF-8">
 <title>Warmly Demo</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { height: 100%; font-family: 'Outfit', system-ui, -apple-system, sans-serif; background: #1a0a0f; color: #fff; overflow: hidden; }
-  #bar {
-    height: 56px;
-    background: #251015;
-    border-bottom: 1px solid #3a1a22;
-    display: flex;
-    align-items: center;
-    padding: 0 16px;
-    gap: 16px;
-  }
-  .logo {
-    font-weight: 600;
-    color: #ec4899;
-    font-size: 13px;
-    letter-spacing: 1.2px;
-    white-space: nowrap;
-  }
-  #f {
-    display: flex;
-    flex: 1;
-    gap: 8px;
-    max-width: 640px;
-  }
-  #d {
-    flex: 1;
-    background: #1a0a0f;
-    border: 1px solid #3a1a22;
+  html, body {
+    height: 100%;
+    font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+    background: #0a0508;
     color: #fff;
-    padding: 9px 12px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-family: inherit;
-    outline: none;
-    transition: border-color 0.15s;
+    overflow: hidden;
   }
-  #d:focus { border-color: #ec4899; }
-  #d::placeholder { color: #6b3a4a; }
-  #f button {
-    background: #ec4899;
-    color: #fff;
-    border: none;
-    padding: 9px 18px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  #f button:hover { background: #f97316; }
+
   #frame-wrap {
-    height: calc(100% - 56px);
-    position: relative;
+    position: absolute;
+    inset: 0;
     background: #0a0508;
   }
+
   #frame {
     width: 100%;
     height: 100%;
@@ -68,6 +30,159 @@
     background: #fff;
     display: block;
   }
+
+  #bar {
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: min(440px, calc(100vw - 28px));
+    padding: 5px 5px 5px 16px;
+    background: rgba(15, 6, 10, 0.55);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(236, 72, 153, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    opacity: 0.7;
+    transition: opacity 0.35s ease, border-color 0.35s ease, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  #bar:hover,
+  #bar:focus-within {
+    opacity: 1;
+    border-color: rgba(236, 72, 153, 0.35);
+  }
+  #bar.idle-empty { opacity: 1; }
+  #bar.hidden {
+    transform: translateX(-50%) translateY(-200%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Hot zone at top of viewport — mouse here brings the bar back */
+  #hot-zone {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 8px;
+    z-index: 9998;
+    pointer-events: auto;
+  }
+
+  /* Tiny ghost indicator when bar is hidden — barely visible reminder */
+  #ghost {
+    position: fixed;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 28px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(236, 72, 153, 0.35);
+    z-index: 9997;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+  body.bar-hidden #ghost { opacity: 1; }
+  body.bar-hidden #hot-zone:hover ~ #ghost { opacity: 0.8; }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #ec4899;
+    box-shadow: 0 0 10px rgba(236, 72, 153, 0.7), 0 0 18px rgba(236, 72, 153, 0.3);
+    flex-shrink: 0;
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.55; transform: scale(0.8); }
+  }
+
+  #f {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  #d {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: none;
+    color: #fff;
+    padding: 6px 0;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 400;
+    outline: none;
+    letter-spacing: 0.2px;
+  }
+  #d::placeholder {
+    color: rgba(255, 255, 255, 0.32);
+    font-weight: 300;
+  }
+
+  #f button {
+    background: rgba(236, 72, 153, 0.12);
+    border: 1px solid rgba(236, 72, 153, 0.25);
+    color: #ec4899;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  #f button:hover {
+    background: #ec4899;
+    color: #fff;
+    border-color: #ec4899;
+    box-shadow: 0 0 14px rgba(236, 72, 153, 0.55);
+  }
+  #f button svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  #hide-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.35);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0;
+    margin-right: 2px;
+    transition: color 0.2s ease, background 0.2s ease;
+  }
+  #hide-btn:hover {
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.08);
+  }
+  #hide-btn svg { width: 10px; height: 10px; }
+
   #placeholder {
     position: absolute;
     inset: 0;
@@ -75,42 +190,58 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    color: #6b3a4a;
-    font-size: 14px;
-    gap: 8px;
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 13px;
+    gap: 6px;
     pointer-events: none;
     text-align: center;
     padding: 24px;
+    font-weight: 300;
+    letter-spacing: 0.4px;
   }
   #placeholder.hidden { display: none; }
-  #placeholder .hint { font-size: 12px; opacity: 0.6; }
+  #placeholder .hint {
+    font-size: 11px;
+    opacity: 0.5;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
 </style>
 </head>
 <body>
-  <div id="bar">
-    <div class="logo">WARMLY DEMO</div>
-    <form id="f">
-      <input id="d" type="text" placeholder="acme.com" autocomplete="off" autofocus spellcheck="false" />
-      <button type="submit">Load</button>
-    </form>
-  </div>
   <div id="frame-wrap">
     <div id="placeholder">
-      <div>Enter a prospect's domain above to load demo</div>
-      <div class="hint">e.g. acme.com — the Warmly widget will load on their site</div>
+      <div>Enter a domain</div>
+      <div class="hint">The Warmly widget will load on their site</div>
     </div>
     <iframe id="frame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
   </div>
+  <div id="bar" class="idle-empty">
+    <div class="dot"></div>
+    <form id="f">
+      <input id="d" type="text" placeholder="acme.com" autocomplete="off" autofocus spellcheck="false" />
+      <button type="submit" aria-label="Load">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+      </button>
+    </form>
+    <button id="hide-btn" type="button" aria-label="Hide controls" title="Hide (\)">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 10l4-4 4 4"/></svg>
+    </button>
+  </div>
+  <div id="hot-zone" aria-hidden="true"></div>
+  <div id="ghost" aria-hidden="true"></div>
 <script>
-  // UPDATE THIS after deploying the Cloudflare Worker
   const WORKER = 'https://warmly-demo-spoof.kwarmly.workers.dev';
 
   const params = new URLSearchParams(location.search);
   const initial = params.get('site');
+  const bar = document.getElementById('bar');
   const f = document.getElementById('f');
   const d = document.getElementById('d');
   const frame = document.getElementById('frame');
   const placeholder = document.getElementById('placeholder');
+  const hideBtn = document.getElementById('hide-btn');
+  const hotZone = document.getElementById('hot-zone');
 
   function clean(input) {
     return input.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
@@ -122,6 +253,13 @@
     frame.src = WORKER + '/?url=' + encodeURIComponent('https://' + c);
     d.value = c;
     placeholder.classList.add('hidden');
+    bar.classList.remove('idle-empty');
+  }
+
+  function setHidden(hidden) {
+    bar.classList.toggle('hidden', hidden);
+    document.body.classList.toggle('bar-hidden', hidden);
+    if (hidden && document.activeElement === d) d.blur();
   }
 
   f.addEventListener('submit', function(e) {
@@ -130,6 +268,23 @@
     if (!c) return;
     history.replaceState(null, '', '?site=' + encodeURIComponent(c));
     load(c);
+  });
+
+  hideBtn.addEventListener('click', function() { setHidden(true); });
+
+  // Reveal: mouse to top edge
+  hotZone.addEventListener('mouseenter', function() {
+    if (bar.classList.contains('hidden')) setHidden(false);
+  });
+
+  // Toggle: backslash key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === '\\') {
+      e.preventDefault();
+      setHidden(!bar.classList.contains('hidden'));
+    } else if (e.key === 'Escape' && !bar.classList.contains('hidden')) {
+      setHidden(true);
+    }
   });
 
   if (initial) load(initial);
