@@ -334,6 +334,52 @@
   document.getElementById('btn-warmly').addEventListener('click', () => fireWidget('warmly'));
   document.getElementById('btn-upvert').addEventListener('click', () => fireWidget('upvert'));
 
+  // Upvert popup persistence: defeat the auto-dismiss timer by locking the
+  // popup's visibility styles with !important inline writes. Real user
+  // close-clicks (isTrusted) still dismiss it normally.
+  (function() {
+    let userClosed = false;
+    let popupRef = null;
+    const locked = {
+      display: 'flex',
+      opacity: '1',
+      visibility: 'visible',
+      'pointer-events': 'auto',
+    };
+    function applyLock(p) {
+      for (const k in locked) {
+        if (p.style.getPropertyValue(k) !== locked[k] ||
+            p.style.getPropertyPriority(k) !== 'important') {
+          p.style.setProperty(k, locked[k], 'important');
+        }
+      }
+    }
+    function trackClose(p) {
+      p.querySelectorAll('button.i').forEach(b => {
+        b.addEventListener('click', e => {
+          if (e.isTrusted) userClosed = true;
+        }, true);
+      });
+    }
+    function bind(p) {
+      if (popupRef === p) return;
+      popupRef = p;
+      trackClose(p);
+      applyLock(p);
+      new MutationObserver(() => {
+        if (!userClosed) applyLock(p);
+      }).observe(p, { attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
+    }
+    new MutationObserver(() => {
+      if (userClosed) return;
+      const live = document.querySelector('.upvert-popup');
+      if (live) bind(live);
+      else if (popupRef && !popupRef.parentNode) {
+        try { document.body.appendChild(popupRef); } catch (e) {}
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  })();
+
   function clean(input) {
     return input.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
   }
