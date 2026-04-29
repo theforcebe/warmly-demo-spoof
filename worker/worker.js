@@ -114,9 +114,9 @@ export default {
     }
 
     // End-of-body: click interceptor (proxy nav) + Upvert persistence guard.
-    // Persistence guard: SPAs (React/Vue) rerender and rip Upvert out. We
-    // observe DOM mutations, track close-button clicks, and re-attach the
-    // popup if it disappears WITHOUT the user closing it.
+    // - Click interceptor keeps internal nav inside the proxy
+    // - Persistence guard locks the popup against site JS that hides it
+    //   via inline style writes or removes it via SPA reconciliation.
     const bodyInjection = '\n<script>(function(){' +
       'var W=' + JSON.stringify(workerOrigin) + ';' +
       'document.addEventListener("click",function(e){' +
@@ -131,26 +131,61 @@ export default {
         '}catch(err){}' +
       '},true);' +
       '' +
-      'var popupRef=null;var userClosed=false;' +
+      'var popupRef=null,userClosed=false,attrObs=null;' +
+      'var locked={display:"flex",opacity:"1",visibility:"visible",' +
+        'animation:"none",transition:"none","pointer-events":"auto",' +
+        'transform:"none"};' +
+      'function applyLock(p){' +
+        'for(var k in locked){' +
+          'if(p.style.getPropertyValue(k)!==locked[k]||' +
+             'p.style.getPropertyPriority(k)!=="important"){' +
+            'p.style.setProperty(k,locked[k],"important");' +
+          '}' +
+        '}' +
+      '}' +
       'function trackClose(p){' +
         'p.querySelectorAll("button.i").forEach(function(b){' +
-          'b.addEventListener("click",function(){userClosed=true;},true);' +
+          'b.addEventListener("click",function(e){' +
+            'if(!e.isTrusted)return;' +
+            'userClosed=true;' +
+            'if(attrObs){attrObs.disconnect();attrObs=null;}' +
+          '},true);' +
         '});' +
       '}' +
-      'var obs=new MutationObserver(function(){' +
+      'function bind(p){' +
+        'if(popupRef===p)return;' +
+        'popupRef=p;' +
+        'trackClose(p);' +
+        'applyLock(p);' +
+        'if(attrObs)attrObs.disconnect();' +
+        'attrObs=new MutationObserver(function(){' +
+          'if(!userClosed)applyLock(p);' +
+        '});' +
+        'attrObs.observe(p,{attributes:true,' +
+          'attributeFilter:["style","class","hidden"]});' +
+        'if(p.parentNode!==document.documentElement){' +
+          'try{document.documentElement.appendChild(p);}catch(e){}' +
+        '}' +
+      '}' +
+      'var domObs=new MutationObserver(function(){' +
         'if(userClosed)return;' +
         'var live=document.querySelector(".upvert-popup");' +
-        'if(live){' +
-          'popupRef=live;' +
-          'trackClose(live);' +
-          'if(live.parentNode!==document.documentElement){' +
-            'try{document.documentElement.appendChild(live);}catch(e){}' +
-          '}' +
-        '}else if(popupRef&&!popupRef.parentNode){' +
+        'if(live){bind(live);}' +
+        'else if(popupRef&&!popupRef.parentNode){' +
           'try{document.documentElement.appendChild(popupRef);}catch(e){}' +
         '}' +
       '});' +
-      'obs.observe(document.documentElement,{childList:true,subtree:true});' +
+      'domObs.observe(document.documentElement,{childList:true,subtree:true});' +
+      '' +
+      'setInterval(function(){' +
+        'if(userClosed)return;' +
+        'var live=document.querySelector(".upvert-popup");' +
+        'if(live){bind(live);applyLock(live);}' +
+        'else if(popupRef){' +
+          'try{document.documentElement.appendChild(popupRef);applyLock(popupRef);}' +
+          'catch(e){}' +
+        '}' +
+      '},100);' +
       '})();</script>\n';
 
     if (/<\/body>/i.test(html)) {
