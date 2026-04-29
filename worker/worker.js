@@ -1,7 +1,9 @@
 // Cloudflare Worker: proxies a target site, strips frame-blocking headers,
 // rewrites relative URLs via <base>, and injects the Warmly widget script.
 
-const WARMLY_SCRIPT = '<script id="warmly-script-loader" src="https://opps-widget.getwarmly.com/warmly.js?clientId=e46b6961c27fa5afcf0a9eb0a157542e" defer></script>';
+// Loaded as the very first thing in <head> with no defer/async so it fires
+// before any framebusters or page scripts can interfere.
+const WARMLY_SCRIPT = '<script id="warmly-script-loader" src="https://opps-widget.getwarmly.com/warmly.js?clientId=e46b6961c27fa5afcf0a9eb0a157542e"></script>';
 
 export default {
   async fetch(request) {
@@ -50,21 +52,23 @@ export default {
     const origin = targetUrl.origin;
     const workerOrigin = reqUrl.origin;
 
-    // Inject <base> so the browser resolves relative asset URLs against the original site
-    const baseTag = '<base href="' + origin + '/">';
-    if (/<head[^>]*>/i.test(html)) {
-      html = html.replace(/<head([^>]*)>/i, '<head$1>\n  ' + baseTag);
-    } else {
-      html = baseTag + html;
-    }
-
-    // Remove any <meta http-equiv="Content-Security-Policy"> that could block our injection
+    // Strip CSP and X-Frame-Options meta tags before any other rewrites
     html = html.replace(/<meta[^>]+http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, '');
     html = html.replace(/<meta[^>]+http-equiv=["']?X-Frame-Options["']?[^>]*>/gi, '');
 
-    // Inject Warmly script + click interceptor so navigation stays inside the proxy
-    const injection = '\n' + WARMLY_SCRIPT + '\n' +
-      '<script>(function(){' +
+    // Inject the Warmly script as the FIRST thing inside <head>, before <base>,
+    // so it loads regardless of what the page does later.
+    const headInjection = '\n  ' + WARMLY_SCRIPT + '\n  <base href="' + origin + '/">';
+    if (/<head[^>]*>/i.test(html)) {
+      html = html.replace(/<head([^>]*)>/i, '<head$1>' + headInjection);
+    } else if (/<html[^>]*>/i.test(html)) {
+      html = html.replace(/<html([^>]*)>/i, '<html$1><head>' + headInjection + '</head>');
+    } else {
+      html = '<head>' + headInjection + '</head>' + html;
+    }
+
+    // Click interceptor at end of body so internal nav stays inside the proxy
+    const bodyInjection = '\n<script>(function(){' +
       'var W=' + JSON.stringify(workerOrigin) + ';' +
       'document.addEventListener("click",function(e){' +
         'var a=e.target&&e.target.closest&&e.target.closest("a");' +
@@ -80,9 +84,9 @@ export default {
       '})();</script>\n';
 
     if (/<\/body>/i.test(html)) {
-      html = html.replace(/<\/body>/i, injection + '</body>');
+      html = html.replace(/<\/body>/i, bodyInjection + '</body>');
     } else {
-      html += injection;
+      html += bodyInjection;
     }
 
     const headers = new Headers();
