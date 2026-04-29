@@ -264,9 +264,178 @@
     letter-spacing: 0.5px;
     text-transform: uppercase;
   }
+
+  /* ─── Login screen ────────────────────────────────────────────────── */
+  #login {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at center, #1a0a14 0%, #0a0508 60%, #050203 100%);
+    transition: opacity 0.4s ease, visibility 0.4s ease;
+  }
+  #login.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  #login::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(236, 72, 153, 0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .login-card {
+    position: relative;
+    z-index: 1;
+    width: min(380px, calc(100vw - 32px));
+    padding: 36px 32px 28px;
+    background: rgba(15, 6, 10, 0.7);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    box-shadow:
+      0 20px 60px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  .login-mark {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+  .login-mark .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #ec4899;
+    box-shadow: 0 0 10px rgba(236, 72, 153, 0.7), 0 0 18px rgba(236, 72, 153, 0.3);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  .login-mark .label {
+    font-size: 11px;
+    font-weight: 500;
+    color: #ec4899;
+    letter-spacing: 1.6px;
+  }
+  .login-card h1 {
+    font-size: 22px;
+    font-weight: 400;
+    color: #fff;
+    margin-bottom: 4px;
+    letter-spacing: -0.2px;
+  }
+  .login-card p.sub {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.45);
+    font-weight: 300;
+    margin-bottom: 24px;
+    letter-spacing: 0.2px;
+  }
+  #login-form { display: flex; flex-direction: column; gap: 12px; }
+  #login-input {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #fff;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 400;
+    outline: none;
+    letter-spacing: 0.2px;
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+  #login-input:focus {
+    border-color: rgba(236, 72, 153, 0.5);
+    background: rgba(255, 255, 255, 0.06);
+  }
+  #login-input::placeholder { color: rgba(255, 255, 255, 0.3); font-weight: 300; }
+  #login-submit {
+    background: #ec4899;
+    color: #fff;
+    border: none;
+    padding: 12px 14px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+  }
+  #login-submit:hover {
+    background: #f97316;
+    box-shadow: 0 0 24px rgba(236, 72, 153, 0.4);
+  }
+  #login-error {
+    color: #ef4444;
+    font-size: 11px;
+    font-weight: 300;
+    letter-spacing: 0.3px;
+    margin-top: 4px;
+    min-height: 14px;
+  }
+
+  /* ─── User pill in bar ────────────────────────────────────────────── */
+  #user-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px 0 4px;
+    height: 22px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.2px;
+    cursor: pointer;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    flex-shrink: 0;
+  }
+  #user-pill:hover {
+    background: rgba(236, 72, 153, 0.1);
+    border-color: rgba(236, 72, 153, 0.3);
+    color: #fff;
+  }
+  #user-pill .avatar {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ec4899, #f97316);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
 </style>
 </head>
 <body>
+  <div id="login">
+    <div class="login-card">
+      <div class="login-mark">
+        <div class="dot"></div>
+        <div class="label">WARMLY DEMO</div>
+      </div>
+      <h1>Sign in</h1>
+      <p class="sub">Enter your work email to load your demo workspace.</p>
+      <form id="login-form">
+        <input id="login-input" type="email" placeholder="you@warmly.ai" autocomplete="email" autofocus spellcheck="false" />
+        <button id="login-submit" type="submit">Continue</button>
+        <div id="login-error" aria-live="polite"></div>
+      </form>
+    </div>
+  </div>
   <div id="frame-wrap">
     <div id="placeholder">
       <div>Enter a domain</div>
@@ -282,6 +451,10 @@
       </button>
       <button id="btn-upvert" class="fire-btn" type="button" data-label="Upvert Popup" aria-label="Fire Upvert popup">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="11" height="9" rx="1.5"/><path d="M5 6.5h6M5 9h4"/></svg>
+      </button>
+      <button id="user-pill" type="button" title="Click to sign out">
+        <span class="avatar" id="user-avatar"></span>
+        <span id="user-name"></span>
       </button>
     </div>
     <form id="f">
@@ -309,25 +482,84 @@
   const hideBtn = document.getElementById('hide-btn');
   const hotZone = document.getElementById('hot-zone');
 
-  // Manual widget firing — scripts load in this shell's origin so they're
-  // untouched by whatever site is in the iframe. Each fires once per session.
-  const widgets = {
-    warmly: {
-      src: 'https://opps-widget.getwarmly.com/warmly.js?clientId=e46b6961c27fa5afcf0a9eb0a157542e',
-      id: 'warmly-script-loader',
+  // ─── User workspace config ──────────────────────────────────────────
+  // To add a teammate: add their email + the two script URLs from their
+  // Warmly Script Setup page and their Upvert site loader.js URL.
+  const USERS = {
+    'keanen@warmly.ai': {
+      name: 'Keanen',
+      warmlyScript: 'https://opps-widget.getwarmly.com/warmly.js?clientId=e46b6961c27fa5afcf0a9eb0a157542e',
+      upvertScript: 'https://cdn.upvertcdn.io/Ar9QyVOBhKFnFOS7CfH7HVF42pQvfT/loader.js',
     },
-    upvert: {
-      src: 'https://cdn.upvertcdn.io/Ar9QyVOBhKFnFOS7CfH7HVF42pQvfT/loader.js',
-      id: 'upvert-script-loader',
-    },
+    // 'ryan@warmly.ai': {
+    //   name: 'Ryan',
+    //   warmlyScript: 'https://opps-widget.getwarmly.com/warmly.js?clientId=...',
+    //   upvertScript: 'https://cdn.upvertcdn.io/.../loader.js',
+    // },
   };
+
+  const STORAGE_KEY = 'warmly-demo-user';
+  const loginEl = document.getElementById('login');
+  const loginForm = document.getElementById('login-form');
+  const loginInput = document.getElementById('login-input');
+  const loginError = document.getElementById('login-error');
+  const userPill = document.getElementById('user-pill');
+  const userAvatar = document.getElementById('user-avatar');
+  const userName = document.getElementById('user-name');
+
+  let currentUser = null; // { email, ...USERS[email] }
+
+  function login(email) {
+    const normalized = email.trim().toLowerCase();
+    const cfg = USERS[normalized];
+    if (!cfg) {
+      loginError.textContent = 'Email not configured. Ask Keanen to add you.';
+      return false;
+    }
+    currentUser = { email: normalized, ...cfg };
+    localStorage.setItem(STORAGE_KEY, normalized);
+    userName.textContent = cfg.name;
+    userAvatar.textContent = cfg.name.charAt(0);
+    loginEl.classList.add('hidden');
+    return true;
+  }
+
+  function logout() {
+    localStorage.removeItem(STORAGE_KEY);
+    currentUser = null;
+    // Reload to fully reset widget state (vendor scripts persist once loaded)
+    location.reload();
+  }
+
+  loginForm.addEventListener('submit', e => {
+    e.preventDefault();
+    loginError.textContent = '';
+    login(loginInput.value);
+  });
+  userPill.addEventListener('click', logout);
+
+  // Auto-login if previously authenticated
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved && USERS[saved]) {
+    login(saved);
+  } else if (saved) {
+    // Saved email no longer in USERS — clear it
+    localStorage.removeItem(STORAGE_KEY);
+  }
+
+  // ─── Manual widget firing ───────────────────────────────────────────
+  // Scripts load in this shell's origin so they're untouched by whatever
+  // site is in the iframe. Each fires once per session (per user).
   function fireWidget(key) {
+    if (!currentUser) return;
     const btn = document.getElementById('btn-' + key);
     if (btn.classList.contains('fired')) return;
-    const w = widgets[key];
+    const src = key === 'warmly' ? currentUser.warmlyScript : currentUser.upvertScript;
+    if (!src) return;
     const s = document.createElement('script');
-    s.src = w.src;
-    s.id = w.id;
+    s.src = src;
+    s.id = key + '-script-loader';
+    if (key === 'warmly') s.id = 'warmly-script-loader'; // Warmly checks this id
     document.head.appendChild(s);
     btn.classList.add('fired');
   }
