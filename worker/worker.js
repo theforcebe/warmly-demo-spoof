@@ -58,21 +58,25 @@ export default {
     html = html.replace(/<meta[^>]+http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, '');
     html = html.replace(/<meta[^>]+http-equiv=["']?X-Frame-Options["']?[^>]*>/gi, '');
 
-    // Inject Warmly as the FIRST thing inside <head>, before <base>,
-    // so it loads regardless of what the page does later.
-    const headInjection = '\n  ' + WARMLY_SCRIPT + '\n  <base href="' + origin + '/">';
+    // Warmly: top of <head> + <base> immediately after, so relative URLs resolve.
+    const headStartInjection = '\n  ' + WARMLY_SCRIPT + '\n  <base href="' + origin + '/">';
     if (/<head[^>]*>/i.test(html)) {
-      html = html.replace(/<head([^>]*)>/i, '<head$1>' + headInjection);
+      html = html.replace(/<head([^>]*)>/i, '<head$1>' + headStartInjection);
     } else if (/<html[^>]*>/i.test(html)) {
-      html = html.replace(/<html([^>]*)>/i, '<html$1><head>' + headInjection + '</head>');
+      html = html.replace(/<html([^>]*)>/i, '<html$1><head>' + headStartInjection + '</head>');
     } else {
-      html = '<head>' + headInjection + '</head>' + html;
+      html = '<head>' + headStartInjection + '</head>' + html;
     }
 
-    // Click interceptor + Upvert at end of body. Upvert sits AFTER all
-    // page stylesheets so its injected styles take precedence and it can
-    // read the fully-parsed <title>/<meta>/OG tags.
-    const bodyInjection = '\n' + UPVERT_SCRIPT + '\n<script>(function(){' +
+    // Upvert: just before </head>, after the page's own stylesheets/meta.
+    // This way the script fires reliably (before body-level page scripts can
+    // interfere) AND its CSS lands after the page's CSS for proper specificity.
+    if (/<\/head>/i.test(html)) {
+      html = html.replace(/<\/head>/i, '\n  ' + UPVERT_SCRIPT + '\n</head>');
+    }
+
+    // Click interceptor at end of body so internal nav stays inside the proxy
+    const bodyInjection = '\n<script>(function(){' +
       'var W=' + JSON.stringify(workerOrigin) + ';' +
       'document.addEventListener("click",function(e){' +
         'var a=e.target&&e.target.closest&&e.target.closest("a");' +
