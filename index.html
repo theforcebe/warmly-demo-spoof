@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Warmly Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: 'Outfit', system-ui, -apple-system, sans-serif; background: #1a0a0f; color: #fff; overflow: hidden; }
+  #bar {
+    height: 56px;
+    background: #251015;
+    border-bottom: 1px solid #3a1a22;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+  }
+  .logo {
+    font-weight: 600;
+    color: #ec4899;
+    font-size: 13px;
+    letter-spacing: 1.2px;
+    white-space: nowrap;
+  }
+  #f {
+    display: flex;
+    flex: 1;
+    gap: 8px;
+    max-width: 640px;
+  }
+  #d {
+    flex: 1;
+    background: #1a0a0f;
+    border: 1px solid #3a1a22;
+    color: #fff;
+    padding: 9px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  #d:focus { border-color: #ec4899; }
+  #d::placeholder { color: #6b3a4a; }
+  #f button {
+    background: #ec4899;
+    color: #fff;
+    border: none;
+    padding: 9px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  #f button:hover { background: #f97316; }
+  #frame-wrap {
+    height: calc(100% - 56px);
+    position: relative;
+    background: #0a0508;
+  }
+  #frame {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #fff;
+    display: block;
+  }
+  #placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #6b3a4a;
+    font-size: 14px;
+    gap: 8px;
+    pointer-events: none;
+    text-align: center;
+    padding: 24px;
+  }
+  #placeholder.hidden { display: none; }
+  #placeholder .hint { font-size: 12px; opacity: 0.6; }
+</style>
+</head>
+<body>
+  <div id="bar">
+    <div class="logo">WARMLY DEMO</div>
+    <form id="f">
+      <input id="d" type="text" placeholder="acme.com" autocomplete="off" autofocus spellcheck="false" />
+      <button type="submit">Load</button>
+    </form>
+  </div>
+  <div id="frame-wrap">
+    <div id="placeholder">
+      <div>Enter a prospect's domain above to load demo</div>
+      <div class="hint">e.g. acme.com — the Warmly widget will load on their site</div>
+    </div>
+    <iframe id="frame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
+  </div>
+<script>
+  // UPDATE THIS after deploying the Cloudflare Worker
+  const WORKER = 'https://warmly-demo-spoof.YOUR-SUBDOMAIN.workers.dev';
+
+  const params = new URLSearchParams(location.search);
+  const initial = params.get('site');
+  const f = document.getElementById('f');
+  const d = document.getElementById('d');
+  const frame = document.getElementById('frame');
+  const placeholder = document.getElementById('placeholder');
+
+  function clean(input) {
+    return input.trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+  }
+
+  function load(domain) {
+    const c = clean(domain);
+    if (!c) return;
+    frame.src = WORKER + '/?url=' + encodeURIComponent('https://' + c);
+    d.value = c;
+    placeholder.classList.add('hidden');
+  }
+
+  f.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const c = clean(d.value);
+    if (!c) return;
+    history.replaceState(null, '', '?site=' + encodeURIComponent(c));
+    load(c);
+  });
+
+  if (initial) load(initial);
+</script>
+</body>
+</html>
