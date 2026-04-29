@@ -6,6 +6,32 @@
 const WARMLY_SCRIPT = '<script id="warmly-script-loader" src="https://opps-widget.getwarmly.com/warmly.js?clientId=e46b6961c27fa5afcf0a9eb0a157542e"></script>';
 const UPVERT_SCRIPT = '<!-- Upvert site "Demo Instance" --><script src="https://cdn.upvertcdn.io/Ar9QyVOBhKFnFOS7CfH7HVF42pQvfT/loader.js"></script>';
 
+// Scoped CSS to repair Upvert popup layout when the proxied site's CSS
+// bleeds in. Real-world failure: site's iframe { width:100% !important }
+// (plus flex min-content) blows the Loom video out of the popup to the
+// left, overflowing the container.
+const UPVERT_FIXES = '<style id="upvert-fixes">\n' +
+'  .upvert-popup, .upvert-popup *, .upvert-popup *::before, .upvert-popup *::after {\n' +
+'    box-sizing: border-box !important;\n' +
+'    max-width: 100% !important;\n' +
+'    min-width: 0 !important;\n' +
+'  }\n' +
+'  .upvert-popup { overflow: hidden !important; }\n' +
+'  .upvert-popup > div {\n' +
+'    flex: 1 1 auto !important;\n' +
+'    min-width: 0 !important;\n' +
+'    overflow: hidden !important;\n' +
+'  }\n' +
+'  .upvert-popup iframe {\n' +
+'    width: 100% !important;\n' +
+'    height: 100% !important;\n' +
+'    max-width: 100% !important;\n' +
+'    min-width: 0 !important;\n' +
+'    border: 0 !important;\n' +
+'    display: block !important;\n' +
+'  }\n' +
+'</style>';
+
 export default {
   async fetch(request) {
     const reqUrl = new URL(request.url);
@@ -58,16 +84,26 @@ export default {
     html = html.replace(/<meta[^>]+http-equiv=["']?X-Frame-Options["']?[^>]*>/gi, '');
 
     // Warmly + Upvert at top of <head>, then <base> for relative URL resolution.
+    // Upvert layout fixes go LAST (just before </head>) so they win specificity.
     const headInjection = '\n  ' + WARMLY_SCRIPT + '\n  ' + UPVERT_SCRIPT + '\n  <base href="' + origin + '/">';
     if (/<head[^>]*>/i.test(html)) {
       html = html.replace(/<head([^>]*)>/i, '<head$1>' + headInjection);
     } else if (/<html[^>]*>/i.test(html)) {
-      html = html.replace(/<html([^>]*)>/i, '<html$1><head>' + headInjection + '</head>');
+      html = html.replace(/<html([^>]*)>/i, '<html$1><head>' + headInjection + '\n' + UPVERT_FIXES + '\n</head>');
     } else {
-      html = '<head>' + headInjection + '</head>' + html;
+      html = '<head>' + headInjection + '\n' + UPVERT_FIXES + '\n</head>' + html;
     }
 
-    // Click interceptor at end of body so internal nav stays inside the proxy
+    // Inject Upvert layout fixes just before </head> so they load AFTER the
+    // page's stylesheets and win specificity battles via !important.
+    if (/<\/head>/i.test(html)) {
+      html = html.replace(/<\/head>/i, '\n  ' + UPVERT_FIXES + '\n</head>');
+    }
+
+    // End-of-body: click interceptor (proxy nav) + Upvert persistence guard.
+    // Persistence guard: SPAs (React/Vue) rerender and rip Upvert out. We
+    // observe DOM mutations, track close-button clicks, and re-attach the
+    // popup if it disappears WITHOUT the user closing it.
     const bodyInjection = '\n<script>(function(){' +
       'var W=' + JSON.stringify(workerOrigin) + ';' +
       'document.addEventListener("click",function(e){' +
@@ -81,6 +117,27 @@ export default {
           'location.href=W+"/?url="+encodeURIComponent(a.href);' +
         '}catch(err){}' +
       '},true);' +
+      '' +
+      'var popupRef=null;var userClosed=false;' +
+      'function trackClose(p){' +
+        'p.querySelectorAll("button.i").forEach(function(b){' +
+          'b.addEventListener("click",function(){userClosed=true;},true);' +
+        '});' +
+      '}' +
+      'var obs=new MutationObserver(function(){' +
+        'if(userClosed)return;' +
+        'var live=document.querySelector(".upvert-popup");' +
+        'if(live){' +
+          'popupRef=live;' +
+          'trackClose(live);' +
+          'if(live.parentNode!==document.documentElement){' +
+            'try{document.documentElement.appendChild(live);}catch(e){}' +
+          '}' +
+        '}else if(popupRef&&!popupRef.parentNode){' +
+          'try{document.documentElement.appendChild(popupRef);}catch(e){}' +
+        '}' +
+      '});' +
+      'obs.observe(document.documentElement,{childList:true,subtree:true});' +
       '})();</script>\n';
 
     if (/<\/body>/i.test(html)) {
