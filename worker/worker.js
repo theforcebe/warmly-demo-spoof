@@ -1,9 +1,10 @@
 // Cloudflare Worker: proxies a target site, strips frame-blocking headers,
 // rewrites relative URLs via <base>, and injects the Warmly widget script.
 
-// Loaded as the very first thing in <head> with no defer/async so it fires
+// Loaded as the very first thing in <head> with no defer/async so they fire
 // before any framebusters or page scripts can interfere.
 const WARMLY_SCRIPT = '<script id="warmly-script-loader" src="https://opps-widget.getwarmly.com/warmly.js?clientId=e46b6961c27fa5afcf0a9eb0a157542e"></script>';
+const UPVERT_SCRIPT = '<!-- Upvert site "Demo Instance" --><script src="https://cdn.upvertcdn.io/Ar9QyVOBhKFnFOS7CfH7HVF42pQvfT/loader.js"></script>';
 
 export default {
   async fetch(request) {
@@ -56,9 +57,9 @@ export default {
     html = html.replace(/<meta[^>]+http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, '');
     html = html.replace(/<meta[^>]+http-equiv=["']?X-Frame-Options["']?[^>]*>/gi, '');
 
-    // Inject the Warmly script as the FIRST thing inside <head>, before <base>,
-    // so it loads regardless of what the page does later.
-    const headInjection = '\n  ' + WARMLY_SCRIPT + '\n  <base href="' + origin + '/">';
+    // Inject Warmly + Upvert scripts as the FIRST thing inside <head>, before <base>,
+    // so they load regardless of what the page does later.
+    const headInjection = '\n  ' + WARMLY_SCRIPT + '\n  ' + UPVERT_SCRIPT + '\n  <base href="' + origin + '/">';
     if (/<head[^>]*>/i.test(html)) {
       html = html.replace(/<head([^>]*)>/i, '<head$1>' + headInjection);
     } else if (/<html[^>]*>/i.test(html)) {
